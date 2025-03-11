@@ -1,3 +1,14 @@
 <resources>
     <string name="app_name">VidRecordAPP</string>
+    <string name="grabar_video">Grabar video</string>
+    <string name="salvar">Salvar</string>
+    <string name="video_grabado_con_exito">Video grabado con éxito</string>
+    <string name="grabacion_cancelada">Grabación cancelada</string>
+    <string name="error_permisos">Se necesitan todos los permisos para grabar video</string>
+    <string name="error_creando_archivo">Error creando el archivo de video</string>
+    <string name="no_hay_camara">No hay aplicación de cámara disponible</string>
+    <string name="no_hay_video">No hay video para guardar</string>
+    <string name="video_guardado_sqlite">Video guardado en SQLite con éxito</string>
+    <string name="video_almacenado_en">Video almacenado en: %s</string>
+    <string name="error_guardando_bd">Error al guardar en la base de datos</string>
 </resources>
