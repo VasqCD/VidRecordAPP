@@ -90,23 +90,6 @@ public class MainActivity extends AppCompatActivity {
         setupPermissions();
 
         // Configurar launcher para captura de video
-        videoCaptureLauncher = registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    if (result.getResultCode() == RESULT_OK) {
-                        // Video grabado con éxito
-                        if (videoUri != null) {
-                            // Configurar el VideoView correctamente
-                            setupVideoView();
-                            Toast.makeText(this, R.string.video_grabado_con_exito, Toast.LENGTH_SHORT).show();
-                        }
-                    } else if (result.getResultCode() == RESULT_CANCELED) {
-                        // Grabación cancelada
-                        Toast.makeText(this, R.string.grabacion_cancelada, Toast.LENGTH_SHORT).show();
-                    }
-                }
-        );
-
         videoSelectLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -115,23 +98,58 @@ public class MainActivity extends AppCompatActivity {
                         if (data != null) {
                             int videoId = data.getIntExtra("VIDEO_ID", -1);
                             String videoPath = data.getStringExtra("VIDEO_PATH");
+                            String uriString = data.getStringExtra("VIDEO_URI");
 
                             if (videoId != -1 && videoPath != null) {
-                                // Cargar el video desde la ruta
-                                File videoFile = new File(videoPath);
-                                if (videoFile.exists()) {
-                                    // Actualizar la URI del video
-                                    videoUri = FileProvider.getUriForFile(this,
-                                            "com.example.vidrecordapp.fileprovider", videoFile);
-                                    currentVideoPath = videoPath;
+                                // Actualizar la URI del video
+                                currentVideoPath = videoPath;
 
-                                    // Reproducir el video
+                                if (uriString != null) {
+                                    videoUri = Uri.parse(uriString);
+                                } else {
+                                    // Crear URI si no se recibió
+                                    File videoFile = new File(videoPath);
+                                    if (videoFile.exists()) {
+                                        videoUri = FileProvider.getUriForFile(this,
+                                                "com.example.vidrecordapp.fileprovider", videoFile);
+                                    }
+                                }
+
+                                // Reproducir el video
+                                if (videoUri != null) {
                                     setupVideoView();
                                 } else {
-                                    Toast.makeText(this, "El archivo de video no existe", Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(this, "No se pudo crear la URI del video", Toast.LENGTH_SHORT).show();
                                 }
                             }
                         }
+                    }
+                }
+        );
+
+        videoCaptureLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK) {
+                        // Video grabado con éxito
+                        if (videoUri != null) {
+                            File videoFile = new File(currentVideoPath);
+                            if (videoFile.exists()) {
+                                Log.d(TAG, "Archivo de video creado en: " + currentVideoPath);
+                                // Configurar el VideoView correctamente
+                                setupVideoView();
+                                Toast.makeText(this, R.string.video_grabado_con_exito, Toast.LENGTH_SHORT).show();
+                            } else {
+                                Log.e(TAG, "El archivo de video no existe después de grabar");
+                                Toast.makeText(this, "El archivo de video no existe después de grabar", Toast.LENGTH_SHORT).show();
+                            }
+                        } else {
+                            Log.e(TAG, "videoUri es null después de grabar");
+                            Toast.makeText(this, "URI de video no válida", Toast.LENGTH_SHORT).show();
+                        }
+                    } else if (result.getResultCode() == RESULT_CANCELED) {
+                        // Grabación cancelada
+                        Toast.makeText(this, R.string.grabacion_cancelada, Toast.LENGTH_SHORT).show();
                     }
                 }
         );
@@ -242,9 +260,8 @@ public class MainActivity extends AppCompatActivity {
 
         // Verificar si hay una app de cámara disponible
         if (takeVideoIntent.resolveActivity(getPackageManager()) != null) {
-            // Mejorar la calidad del video
             takeVideoIntent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1); // Alta calidad
-            takeVideoIntent.putExtra(MediaStore.EXTRA_DURATION_LIMIT, 60); // Límite de 60 segundos (opcional)
+            takeVideoIntent.putExtra(MediaStore.EXTRA_DURATION_LIMIT, 60); // Límite opcional
 
             // Crear archivo para guardar el video
             File videoFile = null;
@@ -263,6 +280,11 @@ public class MainActivity extends AppCompatActivity {
                             "com.example.vidrecordapp.fileprovider",
                             videoFile);
                     takeVideoIntent.putExtra(MediaStore.EXTRA_OUTPUT, videoUri);
+
+                    // Asegúrate de agregar los permisos necesarios para la URI
+                    takeVideoIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    takeVideoIntent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+
                     videoCaptureLauncher.launch(takeVideoIntent);
                 } catch (Exception e) {
                     Log.e(TAG, "Error al preparar URI para video: " + e.getMessage());
@@ -425,7 +447,7 @@ public class MainActivity extends AppCompatActivity {
                 // Establecer un color de fondo para el VideoView
                 videoView.setBackgroundColor(Color.BLACK);
 
-                // Configurar el VideoView con la nueva URI
+                // Importante: Utilizar setVideoURI para la reproducción
                 videoView.setVideoURI(videoUri);
 
                 // Añadir controles de reproducción
@@ -433,42 +455,19 @@ public class MainActivity extends AppCompatActivity {
                 mediaController.setAnchorView(videoView);
                 videoView.setMediaController(mediaController);
 
-                // Mostrar los controles de media inmediatamente
+                // Mostrar los controles inmediatamente
                 mediaController.show(0);
 
-                // Configurar listeners
+                // Establecer listeners
                 videoView.setOnPreparedListener(mp -> {
-                    Log.d(TAG, "VideoView preparado, ancho: " + mp.getVideoWidth() + ", alto: " + mp.getVideoHeight());
-
-                    // Probar diferentes modos de escalado
-                    mp.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT);
-
-                    // Establecer volumen
-                    mp.setVolume(1.0f, 1.0f);
-
-                    // Comenzar reproducción
+                    Log.d(TAG, "VideoView preparado");
                     videoView.start();
-                });
-
-                videoView.setOnInfoListener((mp, what, extra) -> {
-                    Log.d(TAG, "Info VideoView: " + what);
-                    return false;
+                    // Quitar el background negro una vez que el video esté listo
+                    videoView.setBackgroundColor(Color.TRANSPARENT);
                 });
 
                 videoView.setOnErrorListener((mp, what, extra) -> {
                     Log.e(TAG, "Error en VideoView: " + what + ", " + extra);
-
-                    // Intentar utilizar un reproductor externo como alternativa
-                    if (what == MediaPlayer.MEDIA_ERROR_UNKNOWN) {
-                        try {
-                            Intent intent = new Intent(Intent.ACTION_VIEW);
-                            intent.setDataAndType(videoUri, "video/*");
-                            startActivity(intent);
-                        } catch (Exception e) {
-                            Log.e(TAG, "Error al abrir reproductor externo", e);
-                        }
-                    }
-
                     Toast.makeText(MainActivity.this, "Error al reproducir el video", Toast.LENGTH_SHORT).show();
                     return true;
                 });

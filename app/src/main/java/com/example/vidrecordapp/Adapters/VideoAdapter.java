@@ -3,15 +3,18 @@ package com.example.vidrecordapp.Adapters;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.FileProvider;
 
 import com.example.vidrecordapp.Models.VideoModel;
 import com.example.vidrecordapp.R;
@@ -54,10 +57,19 @@ public class VideoAdapter extends ArrayAdapter<VideoModel> {
         ivPlay.setOnClickListener(v -> {
             File videoFile = new File(currentVideo.getPath());
             if (videoFile.exists()) {
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                Uri videoUri = Uri.fromFile(videoFile);
-                intent.setDataAndType(videoUri, "video/*");
-                context.startActivity(intent);
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW);
+                    Uri videoUri = FileProvider.getUriForFile(context,
+                            "com.example.vidrecordapp.fileprovider", videoFile);
+                    intent.setDataAndType(videoUri, "video/*");
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    context.startActivity(intent);
+                } catch (Exception e) {
+                    Log.e("VideoAdapter", "Error reproduciendo video: " + e.getMessage());
+                    Toast.makeText(context, "Error al reproducir el video", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(context, "El archivo no existe", Toast.LENGTH_SHORT).show();
             }
         });
 
